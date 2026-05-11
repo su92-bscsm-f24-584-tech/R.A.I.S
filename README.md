@@ -9,7 +9,7 @@ A multi-brain AI architecture for stock analysis and financial forecasting using
 - Meta-Learning Fusion Engine
 
 The system combines market behavior, financial news sentiment, and long-term forecasting into a unified AI decision pipeline.
-
+# Notes: Model files are excluded because of GitHub file size limits.
 ---
 
 # Architecture
