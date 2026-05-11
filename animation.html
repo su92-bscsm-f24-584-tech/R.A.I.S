@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; background: #00050a; overflow: hidden; }
+        canvas { display: block; filter: contrast(120%) brightness(110%); }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let particles = [];
+let singleChain; // The red chain addition
+const count = 140;
+const connectionDist = 130;
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- START OF YOUR EXACT BASE CODE ---
+class Particle {
+    constructor() {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 280;
+        this.x = canvas.width / 2 + Math.cos(angle) * radius;
+        this.y = canvas.height / 2 + Math.sin(angle) * radius * 0.8;
+        
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = (Math.random() - 0.5) * 0.5;
+        this.size = Math.random() * 2 + 1;
+        this.glowPhase = Math.random() * Math.PI * 2;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.glowPhase += 0.05;
+
+        const dx = this.x - canvas.width/2;
+        const dy = (this.y - canvas.height/2) / 0.8;
+        if (Math.sqrt(dx*dx + dy*dy) > 350) {
+            this.vx *= -1.01; // Your exact bounce logic
+            this.vy *= -1.01;
+        }
+    }
+
+    draw() {
+        const pulse = (Math.sin(this.glowPhase) + 1) / 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        
+        ctx.shadowBlur = 10 + (pulse * 10);
+        ctx.shadowColor = '#00f7ff';
+        ctx.fillStyle = `rgba(135, 206, 250, ${0.5 + pulse * 0.5})`;
+        ctx.fill();
+    }
+}
+// --- END OF YOUR EXACT BASE CODE ---
+
+// --- RED CHAIN LOGIC ADDITION ---
+class GrowingChain {
+    constructor(startIdx) {
+        this.nodes = [startIdx]; 
+        this.progress = 0;
+        this.targetIdx = this.findNeighbor(startIdx);
+        this.maxLength = 15; // Number of connected segments
+    }
+
+    findNeighbor(idx) {
+        const start = particles[idx];
+        let possible = [];
+        for (let i = 0; i < particles.length; i++) {
+            if (this.nodes.includes(i)) continue; 
+            const d = Math.hypot(start.x - particles[i].x, start.y - particles[i].y);
+            if (d < connectionDist) possible.push(i);
+        }
+        return possible.length > 0 ? possible[Math.floor(Math.random() * possible.length)] : null;
+    }
+
+    update() {
+        if (this.targetIdx === null) { this.reset(); return; }
+        this.progress += 0.04;
+        if (this.progress >= 1) {
+            this.nodes.push(this.targetIdx);
+            this.progress = 0;
+            this.targetIdx = this.findNeighbor(this.targetIdx);
+            if (this.nodes.length > this.maxLength) this.reset();
+        }
+    }
+
+    draw() {
+        ctx.save(); // Isolate red glow settings
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff0033';
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = 3.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        ctx.beginPath();
+        for (let i = 0; i < this.nodes.length - 1; i++) {
+            const p1 = particles[this.nodes[i]];
+            const p2 = particles[this.nodes[i+1]];
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+        }
+
+        if (this.targetIdx !== null) {
+            const lastNode = particles[this.nodes[this.nodes.length - 1]];
+            const targetNode = particles[this.targetIdx];
+            const curX = lastNode.x + (targetNode.x - lastNode.x) * this.progress;
+            const curY = lastNode.y + (targetNode.y - lastNode.y) * this.progress;
+            ctx.moveTo(lastNode.x, lastNode.y);
+            ctx.lineTo(curX, curY);
+            ctx.stroke();
+            
+            // Neon Head
+            ctx.beginPath();
+            ctx.arc(curX, curY, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff'; 
+            ctx.fill();
+        } else {
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    reset() {
+        this.nodes = [Math.floor(Math.random() * particles.length)];
+        this.progress = 0;
+        this.targetIdx = this.findNeighbor(this.nodes[0]);
+    }
+}
+
+function init() {
+    for(let i=0; i<count; i++) particles.push(new Particle());
+    singleChain = new GrowingChain(Math.floor(Math.random() * count));
+}
+
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Exact base drawing logic from your code
+    for(let i=0; i<particles.length; i++) {
+        particles[i].update();
+        particles[i].draw(); // Glows are handled here via shadowBlur
+        
+        for(let j=i+1; j<particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if(dist < connectionDist) {
+                ctx.save();
+                ctx.shadowBlur = 0; // Keeping base lines thin/no-blur as per your code
+                ctx.beginPath();
+                ctx.lineWidth = 0.6;
+                ctx.strokeStyle = `rgba(0, 212, 255, ${1 - dist/connectionDist})`;
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+    }
+
+    // Overlay the single red chain
+    singleChain.update();
+    singleChain.draw();
+
+    requestAnimationFrame(animate);
+}
+
+init();
+animate();
+</script>
+</body>
+</html>

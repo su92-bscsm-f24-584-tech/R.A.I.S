@@ -1,0 +1,11 @@
+flask
+torch
+transformers
+yfinance
+requests
+numpy
+pandas
+scikit-learn
+matplotlib
+streamlit
+seaborn
